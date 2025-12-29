@@ -1,19 +1,16 @@
-import gymnasium as gym
 import os
 import sys
+from dotenv import load_dotenv
 import wandb
+
 from wandb.integration.sb3 import WandbCallback
 from stable_baselines3 import DQN
-from dotenv import load_dotenv
 
-# Add project root to path so we can import 'src'
+# import utils & environment
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-# import utils
 from src.utils import suppress_sumo_output
+from src.environment import LaneChangeEnv
 
-# environment
-from src.gym_environment import LaneChangeEnv
 
 # load W&B API key from .env
 load_dotenv()
@@ -22,11 +19,11 @@ load_dotenv()
 def train():
     # Hyperparameters
     config = {
-        "total_timesteps": 10000,
+        "total_timesteps": 50000,
         "learning_rate": 0.0001,
         "buffer_size": 50000,
         "learning_starts": 1000,
-        "batch_size": 32,
+        "batch_size": 64,
         "gamma": 0.99,
         "train_freq": 4,
         "gradient_steps": 1,
@@ -37,7 +34,7 @@ def train():
         "policy": "MlpPolicy",
     }
 
-    # Initialize Weights & Biases
+    # Initialize a new W&B run
     run = wandb.init(
         project="sumo-lane-change",
         config=config,
@@ -50,15 +47,12 @@ def train():
     sumo_cfg_path = "sumo_env/highway.sumocfg"
 
     # Create the environment
-    # We wrap it to ensure it's compatible with SB3's monitoring if needed,
-    # but SB3 usually handles raw Gym envs fine.
     env = LaneChangeEnv(sumo_cfg_file=sumo_cfg_path, mode=config["env_mode"])
 
     # Initialize the Agent (DQN)
-    model = DQN(
-        config["policy"],
-        env,
-        verbose=1,
+    agent = DQN(
+        policy=config["policy"],
+        env=env,
         learning_rate=config["learning_rate"],
         buffer_size=config["buffer_size"],
         learning_starts=config["learning_starts"],
@@ -70,26 +64,20 @@ def train():
         exploration_fraction=config["exploration_fraction"],
         exploration_final_eps=config["exploration_final_eps"],
         tensorboard_log=f"runs/{run.id}",  # Log to a folder linked to W&B run ID
+        verbose=1,
     )
 
-    print("🚀 Training started... Check W&B dashboard for live graphs.")
+    print(" ==> Training started... Check W&B dashboard for live graphs.")
 
     # Create models directory if it doesn't exist
     os.makedirs("models", exist_ok=True)
 
     # Train the agent
     # WandbCallback handles logging of reward, episode length, etc. automatically
-    model.learn(
-        total_timesteps=config["total_timesteps"],
-        callback=WandbCallback(
-            gradient_save_freq=100,
-            model_save_path=f"models/{run.id}",
-            verbose=2,
-        ),
-    )
+    agent.learn(total_timesteps=config["total_timesteps"], callback=WandbCallback())
 
     # Save Final Model
-    model.save(os.path.join("models", "dqn_final.zip"))
+    agent.save(os.path.join("models", "dqn_final.zip"))
 
     # Close environment and W&B
     env.close()

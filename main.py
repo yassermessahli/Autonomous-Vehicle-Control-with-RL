@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from src.gym_environment import LaneChangeEnv
+from src.environment import LaneChangeEnv
 from src.ql import QLearningAgent
 from src.dql import train_drl_agent, load_drl_agent
 

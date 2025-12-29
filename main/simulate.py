@@ -1,15 +1,22 @@
 import os
+import sys
 import time
-from src.gym_environment import LaneChangeEnv
+import argparse
+
+# Add project root to path so we can import 'src'
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from src.environment import LaneChangeEnv
 from src.ql import QLearningAgent
-from src.dql import load_drl_agent
+from stable_baselines3 import DQN
 
 SUMO_CFG = os.path.join("sumo_env", "highway.sumocfg")
-MODELS_DIR = "models"
 
 
-def visualize_agent(agent_type, episodes=1):
+def visualize_agent(agent_type, model_path=None, episodes=1):
     print(f"\n--- Visualizing {agent_type} Agent ---")
+    if model_path:
+        print(f"Loading model from: {model_path}")
 
     mode = "continuous"
     if agent_type == "Q-Learning":
@@ -20,20 +27,18 @@ def visualize_agent(agent_type, episodes=1):
     agent = None
     if agent_type == "Q-Learning":
         agent = QLearningAgent(action_size=env.action_space.n)
-        model_path = os.path.join(MODELS_DIR, "q_table.pkl")
-        if os.path.exists(model_path):
+        if model_path and os.path.exists(model_path):
             agent.load(model_path)
             agent.epsilon = 0
         else:
-            print("Model not found!")
+            print(f"Error: Model not found at {model_path}")
             return
 
     elif agent_type == "DQN":
-        model_path = os.path.join(MODELS_DIR, "dqn_agent")
-        if os.path.exists(model_path + ".zip"):
-            agent = load_drl_agent(model_path)
+        if model_path and os.path.exists(model_path):
+            agent = DQN.load(model_path)
         else:
-            print("Model not found!")
+            print(f"Error: Model not found at {model_path}")
             return
 
     elif agent_type == "SUMO Default":
@@ -60,7 +65,7 @@ def visualize_agent(agent_type, episodes=1):
             total_reward += reward
 
             # Slow down slightly to make it easier to watch
-            time.sleep(0.5)
+            time.sleep(0.3)
 
         print(f"Episode finished. Total Reward: {total_reward:.2f}")
 
@@ -68,8 +73,19 @@ def visualize_agent(agent_type, episodes=1):
 
 
 if __name__ == "__main__":
-    # You can comment/uncomment lines below to choose what to watch
-    visualize_agent("Q-Learning", episodes=1)
-    # visualize_agent('SUMO Default', episodes=1)
-    # visualize_agent('DQN', episodes=1)
-    # visualize_agent('Random', episodes=1)
+    parser = argparse.ArgumentParser(description="Visualize trained agents.")
+    parser.add_argument(
+        "--type",
+        type=str,
+        default="Q-Learning",
+        choices=["Q-Learning", "DQN", "SUMO Default", "Random"],
+        help="Type of agent to visualize",
+    )
+    parser.add_argument(
+        "--model", type=str, default="models/q_table_final.pkl", help="Path to the model file"
+    )
+    parser.add_argument("--episodes", type=int, default=1, help="Number of episodes to run")
+
+    args = parser.parse_args()
+
+    visualize_agent(args.type, args.model, args.episodes)

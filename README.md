@@ -1,63 +1,85 @@
-# Reinforcement Learning for Lane-Changing Decisions on Highways
+# Autonomous Vehicle Control with RL
 
-This project implements an Autonomous Vehicle (AV) agent that learns to make optimal lane-changing decisions on a two-lane highway using Reinforcement Learning. The environment is simulated using SUMO (Simulation of Urban Mobility).
+A simple project to train an autonomous vehicle to change lanes, avoid obstacles, and maximize speed using Reinforcement Learning in the SUMO traffic simulator.
 
-## Project Goal
-Train an AV to navigate around motionless obstacle vehicles while maximizing travel time and avoiding collisions.
+![Simulation Preview](placeholder_image.png)
 
-## Agents Implemented
-1.  **Q-Learning Agent**: A tabular RL agent using a discretized state space.
-2.  **Deep Q-Network (DQN) Agent**: A Deep RL agent using Stable Baselines 3 and continuous state space.
-3.  **SUMO Default Controller**: Baseline comparison using SUMO's built-in lane-changing model.
+## 📂 Project Structure
 
-## Requirements
-*   **Python 3.8+**
-*   **SUMO**: Must be installed and added to your system PATH.
-    *   Download: [https://eclipse.dev/sumo/](https://eclipse.dev/sumo/)
-    *   Ensure SUMO_HOME environment variable is set.
+- **`main/`**: The scripts to run.
+  - `create_sumo_network.py`: Generates the road network files (used by SUMO software and gymnasium).
+  - `train_ql.py`: Trains a Q-Learning agent from scratch.
+  - `train_dql.py`: Trains a Deep Q-Network (DQN) agent using **Stable Baselines3**.
+  - `simulate.py`: Run a simulation to experiment with the trained agents.
+- **`src/`**: The module files of the core logic of the agents and the environment.
+- **`models/`**: Where the model checkpoints are saved.
+- **`sumo_env/`**: Configuration files for the SUMO simulator (auto-generated).
 
-## Installation
+---
 
-1.  Clone the repository.
-2.  Install Python dependencies:
-    `ash
-    pip install -r requirements.txt
-    `
+## 🚀 How to Run
 
-## Setup Environment
+### 1. Prerequisites
 
-1.  Generate the SUMO configuration files:
-    `ash
-    python create_env.py
-    `
-    *   **Note**: If 
-etconvert is not in your PATH, the script will fail to generate highway.net.xml. You must generate it manually using the created .nod.xml and .edg.xml files:
-        `ash
-        netconvert --node-files sumo_env/highway.nod.xml --edge-files sumo_env/highway.edg.xml -o sumo_env/highway.net.xml
-        `
+Make sure you have [**Python 3.13**](https://www.python.org/ftp/python/3.13.0/python-3.13.0-amd64.exe) and [**SUMO**](https://sumo.dlr.de/releases/1.25.0/sumo-win64-1.25.0.msi) installed.
 
-## Running the Training & Evaluation
+```bash
+# sync python dependencies
+uv sync
+```
 
-Run the main script to train both agents and evaluate them:
-`ash
-python main.py
-`
+### 2. Build the Road Network
 
-This script will:
-1.  Train the Q-Learning agent (saved to models/q_table.pkl).
-2.  Train the DQN agent (saved to models/dqn_agent.zip).
-3.  Evaluate Q-Learning, DQN, Random, and SUMO Default agents.
-4.  Save results to logs/evaluation_results.csv.
-5.  Generate plots in plots/.
+First, generate the highway environment files:
 
-## Project Structure
-*   src/: Source code for agents and environment.
-    *   nv.py: Custom Gym wrapper for SUMO.
-    *   q_learning.py: Q-Learning implementation.
-    *   drl_agent.py: DQN wrapper.
-*   sumo_env/: Generated SUMO configuration files.
-*   models/: Saved trained models.
-*   logs/: TensorBoard logs and CSV results.
-*   plots/: Evaluation plots.
-*   create_env.py: Script to generate SUMO network.
-*   main.py: Main execution script.
+```bash
+python main/create_sumo_network.py
+```
+
+### 3. Train the Agents
+
+You can train either a simple Q-Learning agent or a Deep Q-Network agent. We used [Weights & Biases](https://wandb.ai/) to log training metrics in real-time during training to see the progress. So make sure to create a free account and generate an API key and save it in the `.env` file before training.
+
+**To train Q-Learning:**
+
+```bash
+python main/train_ql.py
+```
+
+_Saves model to `models/q_table_final.pkl`_
+
+**To train DQN:**
+
+```bash
+python main/train_dql.py
+```
+
+_Saves model to `models/dqn_final.zip`_
+
+### 4. Watch the Simulation
+
+Once trained, you can watch the agent drive!
+
+**Watch DQN:**
+
+```bash
+python main/simulate.py --type DQN --model models/dqn_final.zip
+```
+
+**Watch Q-Learning:**
+
+```bash
+python main/simulate.py --type Q-Learning --model models/q_table_final.pkl
+```
+
+---
+
+## 📈 View Results
+
+To see graphs of the metrics history during training:
+
+```bash
+tensorboard --logdir runs
+```
+
+Then open the link (usually `http://localhost:6006`) in the browser.

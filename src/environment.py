@@ -1,8 +1,8 @@
 import gymnasium as gym
 from gymnasium import spaces
+
 import numpy as np
 import traci
-import sumolib
 import os
 import sys
 import random
@@ -278,39 +278,85 @@ class LaneChangeEnv(gym.Env):
 
     def _compute_reward(self, action):
         try:
-            # 1. Progress Reward
-            speed = traci.vehicle.getSpeed(self.ego_id)
-            reward = speed * 0.5  # Increased from 0.1
+            # ----------------------
+            # 1. Progress reward
+            # ----------------------
+            # Reward = longitudinal distance gained since last step
+            cur_x = traci.vehicle.getPosition(self.ego_id)[0]
+            progress = cur_x - getattr(self, "_last_x", cur_x)
+            # store for next step
+            self._last_x = cur_x
 
-            # 2. Collision Penalty (Handled in step check, but we can add proximity penalty)
-            # If too close to obstacle
-            obs = self._get_obs()
-            if self.mode == "continuous":
-                dist_front = obs[1] * 200
+            # scale so that moderate positive progress is good
+            r_progress = progress
+
+            # ----------------------
+            # 2. Safety proximity penalty
+            # ----------------------
+            # penalize if too close to an obstacle in current lane
+            # we look at the front distance (unscaled)
+            min_front = 200 * self._get_obs()[1]  # our normalized value back to meters
+            # if gap < safe threshold, give penalty proportional to how close
+            safe_thresh = 15.0
+            if min_front < safe_thresh:
+                # stronger penalty as we get closer
+                r_safety = -2.0 * (safe_thresh - min_front) / safe_thresh
             else:
-                # In discrete mode, we don't have exact dist in obs, need to re-calculate or store
-                # For simplicity, assume we get penalized if 'unsafe'
-                dist_front = 100  # Placeholder
+                r_safety = 0.0
 
-            if dist_front < 10:
-                reward -= 5
-
-            # 3. Lane Change Penalty (to avoid flickering)
+            # ----------------------
+            # 3. Reasonable lane change bonus/penalty
+            # ----------------------
+            r_lane = 0.0
             if action != 0:
-                reward -= 1.0
+                # if we changed lane, check if there was space to the front in that lane
+                # should be safer than before or not lead to closer obstacle
+                lane_idx = traci.vehicle.getLaneIndex(self.ego_id)
+                if action == 1:
+                    target_lane = min(lane_idx + 1, 1)
+                elif action == 2:
+                    target_lane = max(lane_idx - 1, 0)
 
-            # 4. Invalid Move Penalty (Hitting wall)
-            ego_lane = traci.vehicle.getLaneIndex(self.ego_id)
-            if (action == 1 and ego_lane == 1) or (action == 2 and ego_lane == 0):
-                reward -= 10
+                # look at front distance in target lane
+                # (call get_lane_dists similar to internal method)
+                def lane_front_dist(lane):
+                    # simple local helper
+                    obs = [v for v in traci.vehicle.getIDList() if v != self.ego_id]
+                    ego_pos = traci.vehicle.getPosition(self.ego_id)[0]
+                    dists = [
+                        traci.vehicle.getPosition(o)[0] - ego_pos
+                        for o in obs
+                        if traci.vehicle.getLaneIndex(o) == lane and traci.vehicle.getPosition(o)[0] > ego_pos
+                    ]
+                    return min(dists) if dists else 200
 
-            # 5. Low Speed Penalty
-            if speed < 5:
-                reward -= 2.0
+                # compare gaps
+                curr_gap = lane_front_dist(lane_idx)
+                targ_gap = lane_front_dist(target_lane)
 
+                # if target lane has equal/greater gap, give small bonus; else small penalty
+                if targ_gap >= curr_gap:
+                    r_lane += 0.5
+                else:
+                    r_lane -= 0.5
+
+            # ----------------------
+            # 4. Termination events handled outside (in step)
+            #    We'll only add collision/goal adjustments here if needed
+            # ----------------------
+            # collision reward handled post-step in `step()`:
+            #   if collision -> large negative (-100), override
+            # goal reward when reaching end -> positive (+50)
+
+            # ----------------------
+            # Total reward
+            # ----------------------
+            reward = r_progress + r_safety + r_lane
             return reward
-        except:
-            return 0
+
+        except Exception:
+            # safety fallback
+            return 0.0
 
     def _check_collision(self):
         # SUMO reports collisions

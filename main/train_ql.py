@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from src.utils import suppress_sumo_output
 
 # environment and agent
-from src.gym_environment import LaneChangeEnv
+from src.environment import LaneChangeEnv
 from src.ql import QLearningAgent
 
 # load W&B API key from .env
