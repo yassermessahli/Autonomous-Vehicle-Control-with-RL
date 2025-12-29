@@ -64,7 +64,7 @@ def create_sumo_files():
         f.write(
             """<routes>
     <vType id="ego" accel="2.6" decel="4.5" sigma="0.5" length="5" minGap="2.5" maxSpeed="30" color="0,1,0"/>
-    <vType id="obstacle" accel="0.0" decel="0.0" sigma="0.0" length="5" minGap="2.5" maxSpeed="0" color="1,0,0"/>
+    <vType id="obstacle" accel="1.0" decel="4.5" sigma="0.0" length="5" minGap="2.5" maxSpeed="0.1" color="1,0,0"/>
     
     <route id="r0" edges="E0"/>
 </routes>

@@ -2,24 +2,29 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from src.env import LaneChangeEnv
-from src.q_learning import QLearningAgent
-from src.drl_agent import train_drl_agent, load_drl_agent
+from tqdm import tqdm
+from src.gym_environment import LaneChangeEnv
+from src.ql import QLearningAgent
+from src.dql import train_drl_agent, load_drl_agent
 
 SUMO_CFG = os.path.join("sumo_env", "highway.sumocfg")
 MODELS_DIR = "models"
 LOGS_DIR = "logs"
 PLOTS_DIR = "plots"
 
+# Set to True to see the simulation (will be slower)
+USE_GUI = False
+
 
 def train_q_learning(episodes=100):
     print("--- Training Q-Learning Agent ---")
-    env = LaneChangeEnv(SUMO_CFG, mode="discrete", use_gui=False)
+    env = LaneChangeEnv(SUMO_CFG, mode="discrete", use_gui=USE_GUI)
     agent = QLearningAgent(action_size=env.action_space.n)
 
     rewards_history = []
 
-    for e in range(episodes):
+    pbar = tqdm(range(episodes), desc="Training Episodses")
+    for e in pbar:
         state, _ = env.reset()
         total_reward = 0
         done = False
@@ -35,7 +40,7 @@ def train_q_learning(episodes=100):
             total_reward += reward
 
         rewards_history.append(total_reward)
-        print(f"Episode {e+1}/{episodes}, Reward: {total_reward:.2f}, Epsilon: {agent.epsilon:.2f}")
+        # pbar.set_postfix({'Reward': f'{total_reward:.2f}', 'Epsilon': f'{agent.epsilon:.2f}'})
 
     agent.save(os.path.join(MODELS_DIR, "q_table.pkl"))
     env.close()
@@ -52,7 +57,8 @@ def train_q_learning(episodes=100):
 
 def train_drl(timesteps=10000):
     print("--- Training Deep RL Agent (DQN) ---")
-    env = LaneChangeEnv(SUMO_CFG, mode="continuous", use_gui=False)
+    env = LaneChangeEnv(SUMO_CFG, mode="continuous", use_gui=USE_GUI)
+    # Stable Baselines 3 has its own progress bar if verbose=1
     train_drl_agent(
         env, total_timesteps=timesteps, log_dir=LOGS_DIR, model_path=os.path.join(MODELS_DIR, "dqn_agent")
     )
@@ -65,12 +71,12 @@ def evaluate(episodes=10):
     results = []
 
     # 1. Evaluate Q-Learning
-    env_q = LaneChangeEnv(SUMO_CFG, mode="discrete", use_gui=False)
+    env_q = LaneChangeEnv(SUMO_CFG, mode="discrete", use_gui=USE_GUI)
     agent_q = QLearningAgent(action_size=env_q.action_space.n)
     agent_q.load(os.path.join(MODELS_DIR, "q_table.pkl"))
     agent_q.epsilon = 0  # Greedy
 
-    for e in range(episodes):
+    for e in tqdm(range(episodes), desc="Eval Q-Learning"):
         state, _ = env_q.reset()
         total_reward = 0
         done = False
@@ -83,7 +89,7 @@ def evaluate(episodes=10):
             done = terminated or truncated
             total_reward += reward
             steps += 1
-            if terminated and reward < -50:  # Assuming collision penalty is high
+            if terminated and reward < -40:  # Assuming collision penalty is high
                 collision = 1
             state = next_state
 
@@ -99,10 +105,10 @@ def evaluate(episodes=10):
     env_q.close()
 
     # 2. Evaluate DRL
-    env_drl = LaneChangeEnv(SUMO_CFG, mode="continuous", use_gui=False)
+    env_drl = LaneChangeEnv(SUMO_CFG, mode="continuous", use_gui=USE_GUI)
     agent_drl = load_drl_agent(os.path.join(MODELS_DIR, "dqn_agent"))
 
-    for e in range(episodes):
+    for e in tqdm(range(episodes), desc="Eval DQN"):
         obs, _ = env_drl.reset()
         total_reward = 0
         done = False
@@ -115,7 +121,7 @@ def evaluate(episodes=10):
             done = terminated or truncated
             total_reward += reward
             steps += 1
-            if terminated and reward < -50:
+            if terminated and reward < -40:
                 collision = 1
 
         results.append(
@@ -124,8 +130,8 @@ def evaluate(episodes=10):
     env_drl.close()
 
     # 3. Evaluate Random (Baseline)
-    env_rand = LaneChangeEnv(SUMO_CFG, mode="continuous", use_gui=False)
-    for e in range(episodes):
+    env_rand = LaneChangeEnv(SUMO_CFG, mode="continuous", use_gui=USE_GUI)
+    for e in tqdm(range(episodes), desc="Eval Random"):
         obs, _ = env_rand.reset()
         total_reward = 0
         done = False
@@ -138,7 +144,7 @@ def evaluate(episodes=10):
             done = terminated or truncated
             total_reward += reward
             steps += 1
-            if terminated and reward < -50:
+            if terminated and reward < -40:
                 collision = 1
 
         results.append(
@@ -147,10 +153,10 @@ def evaluate(episodes=10):
     env_rand.close()
 
     # 4. Evaluate SUMO Default
-    env_sumo = LaneChangeEnv(SUMO_CFG, mode="continuous", use_gui=False)
+    env_sumo = LaneChangeEnv(SUMO_CFG, mode="continuous", use_gui=USE_GUI)
     env_sumo.set_sumo_control(True)
 
-    for e in range(episodes):
+    for e in tqdm(range(episodes), desc="Eval SUMO Default"):
         obs, _ = env_sumo.reset()
         total_reward = 0
         done = False
@@ -163,7 +169,7 @@ def evaluate(episodes=10):
             done = terminated or truncated
             total_reward += reward
             steps += 1
-            if terminated and reward < -50:
+            if terminated and reward < -40:
                 collision = 1
 
         results.append(
