@@ -4,7 +4,7 @@ A simple project to train an autonomous vehicle to change lanes, avoid obstacles
 
 ![Simulation Preview](placeholder_image.png)
 
-## 📂 Project Structure
+## Project Structure
 
 - **`main/`**: The scripts to run.
   - `create_sumo_network.py`: Generates the road network files (used by SUMO software and gymnasium).
@@ -15,9 +15,7 @@ A simple project to train an autonomous vehicle to change lanes, avoid obstacles
 - **`models/`**: Where the model checkpoints are saved.
 - **`sumo_env/`**: Configuration files for the SUMO simulator (auto-generated).
 
----
-
-## 🚀 How to Run
+## How to Run
 
 ### 1. Prerequisites
 
@@ -74,7 +72,7 @@ python main/simulate.py --type Q-Learning --model models/q_table_final.pkl
 
 ---
 
-## 📈 View Results
+## View Results
 
 To see graphs of the metrics history during training:
 
