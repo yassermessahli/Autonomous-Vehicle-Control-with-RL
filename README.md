@@ -2,7 +2,7 @@
 
 A simple project to train an autonomous vehicle to change lanes, avoid obstacles, and maximize speed using Reinforcement Learning in the SUMO traffic simulator.
 
-![Simulation Preview](placeholder_image.png)
+![Simulation Preview](https://raw.githubusercontent.com/yassermessahli/Autonomous-Vehicle-Control-with-RL/refs/heads/main/assets/sumo.png)
 
 ## Project Structure
 
