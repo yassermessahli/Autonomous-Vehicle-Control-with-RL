@@ -16,7 +16,7 @@ load_dotenv()
 def train():
     # Hyperparameters
     config = {
-        "total_timesteps": 50000,
+        "total_timesteps": 30000,
         "learning_rate": 0.0001,
         "buffer_size": 50000,
         "learning_starts": 1000,
@@ -60,7 +60,7 @@ def train():
         target_update_interval=config["target_update_interval"],
         exploration_fraction=config["exploration_fraction"],
         exploration_final_eps=config["exploration_final_eps"],
-        tensorboard_log=f"runs/{run.id}",  # Log to a folder linked to W&B run ID
+        tensorboard_log=f"runs/DQN/{run.id}",
         verbose=1,
     )
 
