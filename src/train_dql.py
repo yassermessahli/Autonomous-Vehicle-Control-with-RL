@@ -1,5 +1,4 @@
 import os
-import sys
 from dotenv import load_dotenv
 import wandb
 
@@ -7,9 +6,7 @@ from wandb.integration.sb3 import WandbCallback
 from stable_baselines3 import DQN
 
 # import utils & environment
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.utils import suppress_sumo_output
-from src.environment import LaneChangeEnv
+from environment import LaneChangeEnv
 
 
 # load W&B API key from .env
@@ -36,7 +33,7 @@ def train():
 
     # Initialize a new W&B run
     run = wandb.init(
-        project="sumo-lane-change",
+        project="sumo-lane-change-dql",
         config=config,
         sync_tensorboard=True,  # Auto-log SB3 metrics
         monitor_gym=True,  # Auto-log Gym video/metrics

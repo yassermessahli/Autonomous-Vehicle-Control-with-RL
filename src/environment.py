@@ -277,86 +277,63 @@ class LaneChangeEnv(gym.Env):
             return np.zeros(6 if self.mode == "continuous" else 4, dtype=np.float32)
 
     def _compute_reward(self, action):
-        try:
-            # ----------------------
-            # 1. Progress reward
-            # ----------------------
-            # Reward = longitudinal distance gained since last step
-            cur_x = traci.vehicle.getPosition(self.ego_id)[0]
-            progress = cur_x - getattr(self, "_last_x", cur_x)
-            # store for next step
-            self._last_x = cur_x
+        # ----------------------
+        # Constants (Tune these)
+        # ----------------------
+        MAX_SPEED = 30.0  # e.g., 30 m/s (~108 km/h)
+        COLLISION_PENALTY = -50.0
+        LANE_CHANGE_COST = -0.5  # Small penalty to discourage jitter
+        HEADWAY_COST = -1.0
+        SAFE_HEADWAY = 2.0  # seconds (Two-second rule)
 
-            # scale so that moderate positive progress is good
-            r_progress = progress
+        reward = 0.0
 
-            # ----------------------
-            # 2. Safety proximity penalty
-            # ----------------------
-            # penalize if too close to an obstacle in current lane
-            # we look at the front distance (unscaled)
-            min_front = 200 * self._get_obs()[1]  # our normalized value back to meters
-            # if gap < safe threshold, give penalty proportional to how close
-            safe_thresh = 15.0
-            if min_front < safe_thresh:
-                # stronger penalty as we get closer
-                r_safety = -2.0 * (safe_thresh - min_front) / safe_thresh
-            else:
-                r_safety = 0.0
+        # ----------------------
+        # 1. High Speed Reward (The Engine)
+        # ----------------------
+        # We reward the agent for driving near max speed.
+        # If stuck behind a car, this drops, naturally motivating a lane change.
+        v_ego = traci.vehicle.getSpeed(self.ego_id)
+        r_speed = v_ego / MAX_SPEED  # Normalized 0.0 to 1.0
+        reward += r_speed
 
-            # ----------------------
-            # 3. Reasonable lane change bonus/penalty
-            # ----------------------
-            r_lane = 0.0
-            if action != 0:
-                # if we changed lane, check if there was space to the front in that lane
-                # should be safer than before or not lead to closer obstacle
-                lane_idx = traci.vehicle.getLaneIndex(self.ego_id)
-                if action == 1:
-                    target_lane = min(lane_idx + 1, 1)
-                elif action == 2:
-                    target_lane = max(lane_idx - 1, 0)
+        # ----------------------
+        # 2. Stability Penalty (The Stabilizer)
+        # ----------------------
+        # Penalize every lane change. This stops the "zigzag farming".
+        # The agent will only change lanes if the potential speed gain > 0.5
+        if action != 0:  # Assuming 0 is Keep Lane
+            reward += LANE_CHANGE_COST
 
-                # look at front distance in target lane
-                # (call get_lane_dists similar to internal method)
-                def lane_front_dist(lane):
-                    # simple local helper
-                    obs = [v for v in traci.vehicle.getIDList() if v != self.ego_id]
-                    ego_pos = traci.vehicle.getPosition(self.ego_id)[0]
-                    dists = [
-                        traci.vehicle.getPosition(o)[0] - ego_pos
-                        for o in obs
-                        if traci.vehicle.getLaneIndex(o) == lane and traci.vehicle.getPosition(o)[0] > ego_pos
-                    ]
-                    return min(dists) if dists else 200
+        # ----------------------
+        # 3. Safety/Headway (The Brakes)
+        # ----------------------
+        # Instead of fixed meters, use Time Headway (Distance / Speed)
+        # This scales with how fast you are driving.
 
-                # compare gaps
-                curr_gap = lane_front_dist(lane_idx)
-                targ_gap = lane_front_dist(target_lane)
+        # Get distance to closest leader (your existing logic is fine here)
+        # Note: traci.vehicle.getLeader returns (vehicle_id, dist) or None
+        leader_info = traci.vehicle.getLeader(self.ego_id)
+        if leader_info:
+            leader_dist = leader_info[1]
+            # Calculate time headway (avoid division by zero)
+            time_headway = leader_dist / (v_ego + 0.001)
 
-                # if target lane has equal/greater gap, give small bonus; else small penalty
-                if targ_gap >= curr_gap:
-                    r_lane += 0.5
-                else:
-                    r_lane -= 0.5
+            # If we are closer than 2 seconds, apply penalty
+            if time_headway < SAFE_HEADWAY:
+                # Penalty increases as we get closer (0 to -1.0)
+                # Formula: -(2.0 - current) / 2.0
+                r_headway = -(SAFE_HEADWAY - time_headway) / SAFE_HEADWAY
+                reward += r_headway
 
-            # ----------------------
-            # 4. Termination events handled outside (in step)
-            #    We'll only add collision/goal adjustments here if needed
-            # ----------------------
-            # collision reward handled post-step in `step()`:
-            #   if collision -> large negative (-100), override
-            # goal reward when reaching end -> positive (+50)
+        # ----------------------
+        # 4. Collision (Crucial)
+        # ----------------------
+        # If a collision occurred in this step (check traci collision list)
+        # usually handled in 'step' but can be added here if 'done' flag isn't enough
+        # reward += COLLISION_PENALTY
 
-            # ----------------------
-            # Total reward
-            # ----------------------
-            reward = r_progress + r_safety + r_lane
-            return reward
-
-        except Exception:
-            # safety fallback
-            return 0.0
+        return reward
 
     def _check_collision(self):
         # SUMO reports collisions

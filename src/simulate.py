@@ -1,13 +1,9 @@
 import os
-import sys
 import time
 import argparse
 
-# Add project root to path so we can import 'src'
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from src.environment import LaneChangeEnv
-from src.ql import QLearningAgent
+from environment import LaneChangeEnv
+from ql import QLearningAgent
 from stable_baselines3 import DQN
 
 SUMO_CFG = os.path.join("sumo_env", "highway.sumocfg")

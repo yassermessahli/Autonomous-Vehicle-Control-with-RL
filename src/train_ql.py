@@ -1,16 +1,14 @@
-import gymnasium as gym
-import numpy as np
 import os
 import wandb
 from tqdm import tqdm
 from dotenv import load_dotenv
 
 # importat utils
-from src.utils import suppress_sumo_output
+from utils import suppress_sumo_output
 
 # environment and agent
-from src.environment import LaneChangeEnv
-from src.ql import QLearningAgent
+from environment import LaneChangeEnv
+from ql import QLearningAgent
 
 # load W&B API key from .env
 load_dotenv()
@@ -20,17 +18,17 @@ load_dotenv()
 def train():
     # Hyperparameters
     config = {
-        "episodes": 500,
-        "learning_rate": 0.1,  # tabular needs higher LR than DQN
+        "episodes": 1000,
+        "learning_rate": 0.05,  # tabular needs higher LR than DQN
         "gamma": 0.95,  # Discount factor
         "epsilon_start": 1.0,
-        "epsilon_decay": 0.995,
-        "epsilon_min": 0.01,
+        "epsilon_decay": 0.99,
+        "epsilon_min": 0.05,
         "env_mode": "discrete",  # Q-Learning requires discrete state space
     }
 
     # Initialize Weights & Biases
-    wandb.init(project="sumo-lane-change", config=config)
+    wandb.init(project="sumo-lane-change-ql", config=config)
 
     # Initialize Road Environment
     sumo_cfg_path = "sumo_env/highway.sumocfg"
@@ -46,7 +44,7 @@ def train():
         epsilon_min=config["epsilon_min"],
     )
 
-    print("🚀 Training started... Check W&B dashboard for live graphs.")
+    print("==> Training started... Check W&B dashboard for live graphs.")
 
     # Create models directory if it doesn't exist
     os.makedirs("models", exist_ok=True)
@@ -58,6 +56,7 @@ def train():
         with suppress_sumo_output():
             state, _ = env.reset()
 
+        # parameter initialization
         total_reward = 0
         steps = 0
         terminated = False
@@ -94,13 +93,14 @@ def train():
 
         # Log to W&B
         wandb.log(
-            {
-                "total_reward": total_reward,
-                "epsilon": agent.epsilon,
-                "steps": steps,
-                "lane_changes": lane_changes,
-                "collisions": collisions,
-            }
+            data={
+                "total reward in episode": total_reward,
+                "epsilon value": agent.epsilon,
+                "steps in episode": steps,
+                "Nb of lane changes": lane_changes,
+                "Nb of collisions": collisions,
+            },
+            step=episode,
         )
 
     # Save Model

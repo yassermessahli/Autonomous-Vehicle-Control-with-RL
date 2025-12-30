@@ -1,6 +1,5 @@
 import os
 import subprocess
-import sys
 
 # Configuration
 SUMO_ENV_DIR = "sumo_env"
